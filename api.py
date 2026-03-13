@@ -11,7 +11,7 @@ from py_yt import (
     Suggestions,
     Recommendations,
 )
-from py_yt.extras import Lyrics
+from py_yt.extras import Lyrics, Lyrics2
 
 # Load environment variables from .env file
 load_dotenv()
@@ -127,6 +127,21 @@ async def get_lyrics(query: str):
         logging.error(f"Error in /lyrics: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/lyrics/v2", tags=["Lyrics"])
+async def get_lyrics_v2(
+    song: str,
+    artist: Optional[str] = None,
+    timestamps: bool = False,
+    mood: bool = False,
+    metadata: bool = False,
+    fast: bool = False,
+):
+    """Get advanced lyrics with timestamps, mood, and metadata."""
+    try:
+        return await Lyrics2.get(song, artist, timestamps, mood, metadata, fast)
+    except Exception as e:
+        logging.error(f"Error in /lyrics/v2: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/recommendations/genre", tags=["Recommendations"])
 async def get_genre_recommendations(genre: str, limit: int = 10):

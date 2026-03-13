@@ -1,5 +1,5 @@
 import copy
-from typing import Union
+from typing import Union, Optional
 import httpx
 
 from py_yt.core.constants import ResultMode
@@ -1792,6 +1792,78 @@ class Lyrics:
             return None
 
 
+class Lyrics2:
+    @staticmethod
+    async def get(
+        song: str,
+        artist: Optional[str] = None,
+        timestamps: bool = False,
+        mood: bool = False,
+        metadata: bool = False,
+        fast: bool = False,
+    ) -> Union[dict, None]:
+        """Fetches lyrics from the advanced Lyrics API."""
+        try:
+            resolved_artist = artist
+            if not resolved_artist:
+                try:
+                    from py_yt.search import VideosSearch
+                    search = VideosSearch(song, limit=1)
+                    res = await search.next()
+                    if res and res.get("result"):
+                        video = res["result"][0]
+                        title = video.get("title", "")
+                        if " - " in title:
+                            resolved_artist = title.split(" - ")[0].strip()
+                        else:
+                            resolved_artist = video.get("channel", {}).get("name")
+                except Exception:
+                    pass
+
+            params = {
+                "artist": resolved_artist if resolved_artist else "",
+                "song": song,
+                "timestamps": str(timestamps).lower(),
+                "mood": str(mood).lower(),
+                "metadata": str(metadata).lower(),
+                "fast": str(fast).lower(),
+            }
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "https://test-0k.onrender.com/lyrics/",
+                    params=params,
+                    timeout=20,
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("status") != "error":
+                        return data
+
+                    # Fallback: Try getting artist from Lyrics endpoint
+                    try:
+                        lyrics_res = await Lyrics.get(song)
+                        if lyrics_res and lyrics_res.get("artistName"):
+                            fallback_artist = lyrics_res.get("artistName")
+                            # Only retry if the artist is different to avoid loops
+                            if fallback_artist != resolved_artist:
+                                params["artist"] = fallback_artist
+                                retry_response = await client.get(
+                                    "https://test-0k.onrender.com/lyrics/",
+                                    params=params,
+                                    timeout=20,
+                                )
+                                if retry_response.status_code == 200:
+                                    retry_data = retry_response.json()
+                                    return retry_data
+                    except Exception:
+                        pass
+                    
+                    return data
+        except Exception:
+            pass
+        return None
+
+
 class Recommendations:
     """Fetches music recommendations using the Last.fm API.
     Requires 'LASTFM_API_KEY' environment variable.
@@ -1802,6 +1874,23 @@ class Recommendations:
     def _get_api_key():
         import os
         return os.getenv("LASTFM_API_KEY")
+
+    @staticmethod
+    def _clean_response(tracks: Union[list, dict]) -> list:
+        """Sanitizes the Last.fm response to only show title and artist."""
+        if isinstance(tracks, dict):
+            tracks = [tracks]
+        
+        cleaned = []
+        for track in tracks:
+            if isinstance(track, dict):
+                artist = track.get("artist")
+                artist_name = artist.get("name") if isinstance(artist, dict) else str(artist)
+                cleaned.append({
+                    "title": track.get("name"),
+                    "artist": artist_name
+                })
+        return cleaned
 
     @staticmethod
     async def get_by_genre(genre: str, limit: int = 10) -> Union[dict, list, None]:
@@ -1822,7 +1911,8 @@ class Recommendations:
             response = await client.get(Recommendations.BASE_URL, params=params)
             if response.status_code == 200:
                 data = response.json()
-                return data.get("tracks", {}).get("track", [])
+                tracks = data.get("tracks", {}).get("track", [])
+                return Recommendations._clean_response(tracks)
         return None
 
     @staticmethod
@@ -1845,5 +1935,6 @@ class Recommendations:
                     sim_params = {"method": "track.getsimilar", "artist": track_info.get("artist"), "track": track_info.get("name"), "api_key": api_key, "format": "json", "limit": limit}
                     sim_res = await client.get(Recommendations.BASE_URL, params=sim_params)
                     if sim_res.status_code == 200:
-                        return sim_res.json().get("similartracks", {}).get("track", [])
+                        tracks = sim_res.json().get("similartracks", {}).get("track", [])
+                        return Recommendations._clean_response(tracks)
         return None
