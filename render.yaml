@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: sonic-search-api
+    env: docker
+    plan: free
+    branch: main
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000

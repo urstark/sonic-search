@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py-yt-search"
+version = "2.1.0"
+description = "An unofficial YouTube API to search and retrieve YouTube data."
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT License"}
+authors = [
+  {name = "urstark"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "httpx",
+    "fastapi",
+    "uvicorn[standard]",
+    "python-dotenv",
+    "pyngrok",
+]
+
+[project.urls]
+Homepage = "https://github.com/urstark/sonic-search"
